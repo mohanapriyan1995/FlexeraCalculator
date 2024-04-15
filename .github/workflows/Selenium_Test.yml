@@ -1,0 +1,51 @@
+name: Selenium Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Build
+      run: dotnet build --configuration Release
+    
+    - name: Download Chrome WebDriver
+      run: |
+        Invoke-WebRequest -Uri "https://chromedriver.storage.googleapis.com/LATEST_RELEASE" -OutFile latest.txt
+        $version = Get-Content latest.txt
+        Invoke-WebRequest -Uri "https://chromedriver.storage.googleapis.com/$version/chromedriver_win32.zip" -OutFile chromedriver.zip
+        Expand-Archive -Path chromedriver.zip -DestinationPath .
+        Remove-Item -Path chromedriver.zip
+
+    - name: Run Tests
+      id: test
+      run: |
+        dotnet test --logger "console;verbosity=detailed" > test_results.txt
+      
+    - name: Save Test Results
+      if: ${{ steps.test.outcome == 'success' }}
+      run: echo "Test results saved successfully"
+      shell: bash
+
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v2
+      with:
+        name: Test Results
+        path: test_results.txt
